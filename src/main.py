@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from os import getenv
-from helpers.ShipStation import ShipStation
+from helpers.ship_station import ShipStation
 import requests
 
 
