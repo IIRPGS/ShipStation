@@ -1,7 +1,8 @@
 from dotenv import load_dotenv
 from os import getenv
-from helpers.ship_station import ShipStation
-import requests
+import sys
+sys.path.append("../src")
+from ship_station import ShipStation
 
 
 load_dotenv()

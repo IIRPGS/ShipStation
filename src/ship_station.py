@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from loguru import logger
 import base64
 import requests
-import json
 
 
 @dataclass

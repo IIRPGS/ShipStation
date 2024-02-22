@@ -4,4 +4,5 @@ idna==3.6
 loguru==0.7.2
 python-dotenv==1.0.1
 requests==2.31.0
+setuptools==69.1.0
 urllib3==2.2.0
