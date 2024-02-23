@@ -1,8 +1,8 @@
 from dotenv import load_dotenv
 from os import getenv
 import sys
-sys.path.append("../src")
-from ship_station import ShipStation
+sys.path.append("../")
+from sales_station.ship_station import ShipStation
 
 
 load_dotenv()
