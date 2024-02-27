@@ -16,6 +16,7 @@ class ShipStationMeta:
         "stores": "/stores/",
         "webhooks": "/webhooks/",
         "webhook_subscribe": "/webhooks/subscribe/",
+        "webhook_delete": "/webhooks/",
         "update_order": "/orders/createorder/",
     }
     order_status_able_to_be_updated = [
@@ -40,11 +41,13 @@ class ShipStationMeta:
     request_remaining: int = 40
     request_next_cycle_in_seconds: int = 60
 
-    def build_path_url(self, path: str) -> str:
+    def build_path_url(self, path: str, additional_path: str = "") -> str:
+        url = "https://" + self.host
         if path.lower() in self.route_map:
-            return "https://" + self.host + self.route_map[path]
-        return "https://" + self.host
-
+            url += self.route_map[path]
+        if additional_path:
+            url += additional_path
+        return url
 
 class ShipStation(ShipStationMeta):
     def __init__(self, api_key, api_secret):
@@ -91,7 +94,7 @@ class ShipStation(ShipStationMeta):
     ) -> bool:
         if self.api_limit_at_max():
             logger.error(
-                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds -- order {order_id}"
+                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds"
             )
             return False
         webhook_url = self.build_path_url("webhook_subscribe")
@@ -111,7 +114,7 @@ class ShipStation(ShipStationMeta):
     def get_webhooks(self) -> dict:
         if self.api_limit_at_max():
             logger.error(
-                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds -- order {order_id}"
+                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds"
             )
             return False
         webhook_url = self.build_path_url("webhooks")
@@ -121,6 +124,18 @@ class ShipStation(ShipStationMeta):
             return {}
         return res.json()
 
+    def delete_webhook(self, webhook_id: str) -> bool:
+        if self.api_limit_at_max():
+            logger.error(
+                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds"
+            )
+            return False
+        webhook_url = self.build_path_url("webhook_delete", webhook_id)
+        res = requests.delete(webhook_url, headers=self.authorization_header)
+        if not res.ok:
+            logger.error(f"Failed to get webhook lists {res.status_code} -- {res.text}")
+            return False
+        return True
 
     def get_all_stores(self, show_inactive_stores: bool = False) -> dict[str, dict]:
         stores_url = self.build_path_url("stores")
@@ -225,8 +240,9 @@ class ShipStation(ShipStationMeta):
         if not self.is_order_able_to_be_updated(order):
             order_status = order["orderStatus"]
             logger.error(
-                f"Order {order_id} is not able to be updated. In status {order_status}"
+                f"Order {order_id} is not able to be updated in {order_status} status"
             )
+            return update_status
         order_body = {
             k: v
             for k, v in order.items()
