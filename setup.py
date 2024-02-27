@@ -5,14 +5,14 @@ with open("requirements.txt") as f:
     requirements = [x.strip() for x in requirements]
 
 setup(
-    name="sales_station",
+    name="ship_station",
     version="0.1",
     author="Christian",
     author_email="cclark@iirp.edu",
-    description="Package for updating/sending Salesforce info to SalesForce",
+    description="Wrapper for updating/sending Salesforce info to SalesForce",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/sincile/SalesStation",
+    url="https://github.com/IIRPGS/ShipStation/",
     packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

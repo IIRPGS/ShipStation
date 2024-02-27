@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from os import getenv
 import sys
 
-sys.path.append("../sales_station/")
+sys.path.append("../ship_station/")
 from ship_station import ShipStation
 
 
