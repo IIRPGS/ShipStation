@@ -4,11 +4,11 @@ Package to make integration between Salesforce and ShipStation easier
 ## Setup
 ### Install the package
 ```shell
-pip install git+https://github.com/sincile/SalesStation.git
+pip install git+https://github.com/IIRPGS/ShipStation.git
 ```
 ### Import the class
 ```python
-from sales_station.ship_station import ShipStation
+from ship_station.ship_station import ShipStation
 ```
 ### Initialize an instance of the class
 ```python
