@@ -1,10 +1,10 @@
-from dotenv import load_dotenv
-from os import getenv
 import sys
+from os import getenv
+
+from dotenv import load_dotenv
 
 sys.path.append("../ship_station/")
 from ship_station import ShipStation
-
 
 load_dotenv()
 
