@@ -1,13 +1,16 @@
 import sys
-from os import getenv
+import os
 
 from dotenv import load_dotenv
 
-sys.path.append("../ship_station/")
-from ship_station import ShipStation
+sys.path.append("../")
+from ship_station.ship_station import ShipStation
+
+BASEDIR = os.path.abspath(os.path.dirname(__file__))
+load_dotenv(os.path.join(BASEDIR, ".env"))
 
 load_dotenv()
 
-ss_api_key = getenv("SHIPSTATION_API_KEY", "")
-ss_api_secret = getenv("SHIPSTATION_API_SECRET", "")
+ss_api_key = os.getenv("SHIPSTATION_API_KEY", "")
+ss_api_secret = os.getenv("SHIPSTATION_API_SECRET", "")
 handler = ShipStation(ss_api_key, ss_api_secret)
