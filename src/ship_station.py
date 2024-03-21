@@ -1,23 +1,36 @@
 import base64
 from dataclasses import dataclass
+from typing import Any, Annotated
+import json
 
 import requests
 from loguru import logger
+from order_response import ShipStationOrderResponse
 
 
 @dataclass
 class ShipStationMeta:
     """
-    Dataclass for holding meta information about the ShipStation API and current instance's request limits
+    Dataclass for holding meta information about the ShipStation API
+    and current instance's request limits
 
     Attributes:
-        rate_limit_headers: (list) Headers used to keep track of request limits
-        route_map: (dict) Used to retrieve api resource paths. Key is the simplified name, Value is the url path
-        order_status_able_to_be_updated: (list) order statuses that are able to be changed/updated by the api
-        remove_order_keys_before_updating: (list) keys from an order call that need to be removed before updating an order. See child function update_order_notes for reasoning
+        rate_limit_headers: (list) Request headers.
+                Used to keep track of request limits
+        route_map: (dict) Used to retrieve api resource paths.
+                Key is the simplified name,
+                Value is the url path
+        order_status_able_to_be_updated: (list)
+                Order statuses that can be
+                changed/updated by the api
+        remove_order_keys_before_updating: (list)
+                Keys from an order call
+                that need to be removed before updating an order.
+                See child function update_order_notes for reasoning
         host: (str) the host url for the ShipStation API
         request_remaining: (int) number of requests remaning in current api cycle
-        request_next_cycle_in_seconds: (int) amount of seconds before the request cycle refreshes
+        request_next_cycle_in_seconds: (int)
+            Amount of seconds before the request cycle refreshes
 
     Methods:
         build_path_url: builds the api url based on the route_map
@@ -96,6 +109,15 @@ class ShipStation(ShipStationMeta):
         self.api_secret = api_secret
         self.__build_authorization_header()
 
+    def __remove_basic_in_auth_string(self, auth_string: str) -> str:
+        if "basic" in auth_string.lower():
+            auth_string = auth_string.lower().split("basic ")[-1]
+        return auth_string
+
+    def __decode_b64_auth_string(self, auth_string: str) -> list[str]:
+        decoded_string = base64.standard_b64decode(auth_string).decode("utf-8")
+        return decoded_string.split(":")
+
     def authorize_request(self, auth_string: str) -> bool:
         """
         Checks if the given key matches instance's saved key + secret combo
@@ -106,11 +128,9 @@ class ShipStation(ShipStationMeta):
         """
         is_authorized = False
 
-        if "basic" in auth_string.lower():
-            auth_string = auth_string.lower().split("basic ")[-1]
+        auth_string = self.__remove_basic_in_auth_string(auth_string)
+        decoded_string = self.__decode_b64_auth_string(auth_string)
 
-        decoded_string = base64.standard_b64decode(auth_string).decode("utf-8")
-        decoded_string = decoded_string.split(":")
         if len(decoded_string) < 2:
             logger.error("Authorization Failed: decoded auth key has length < 2")
             return is_authorized
@@ -121,9 +141,7 @@ class ShipStation(ShipStationMeta):
         if given_key != self.api_key and given_secret != self.api_secret:
             logger.error("Authorization Failed: Given information is invalid")
             return is_authorized
-
-        is_authorized = True
-        return is_authorized
+        return True
 
     def __build_authorization_header(self):
         """
@@ -133,16 +151,15 @@ class ShipStation(ShipStationMeta):
         """
         auth_key_base64 = base64.b64encode(
             f"{self.api_key}:{self.api_secret}".encode("utf-8")
-        )
-        auth_key_base64 = auth_key_base64.decode("utf-8")
+        ).decode("utf-8")
         self.authorization_header = {"Authorization": f"Basic {auth_key_base64}"}
 
-    def create_webhook_endpoint(
+    def create_webhook_subscription(
         self,
         target_url: str,
         event: str = "ORDER_NOTIFY",
-        store_id: str = None,
-        friendly_name: str = None,
+        store_id: str = "",
+        friendly_name: str = "",
     ) -> bool:
         """
         Creates a webhook subscription
@@ -171,7 +188,12 @@ class ShipStation(ShipStationMeta):
         logger.success(f"Webhook created: {res.json()}")
         return True
 
-    def get_webhooks(self) -> list[dict]:
+    def get_webhooks(
+        self,
+    ) -> Annotated[
+        Any,
+        "JSON like object, typically reponse from request library. On failure returns list with empty dict",
+    ]:
         """
         Lists all webhook subscriptions in the ShipStation instance
         Returns all subscriptions in ShipStation account. Dict format
@@ -180,13 +202,14 @@ class ShipStation(ShipStationMeta):
             logger.error(
                 f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds"
             )
-            return False
+            return [{}]
         webhook_url = self.build_path_url("webhooks")
         res = requests.get(webhook_url, headers=self.authorization_header, timeout=5)
         if not res.ok:
             logger.error(f"Failed to get webhook lists {res.status_code} -- {res.text}")
-            return {}
-        return res.json()
+            return [{}]
+        webhook_list = res.json()["webhooks"]
+        return webhook_list
 
     def delete_webhook(self, webhook_id: str) -> bool:
         """
@@ -206,11 +229,14 @@ class ShipStation(ShipStationMeta):
             return False
         return True
 
-    def get_all_stores(self, show_inactive_stores: bool = False) -> list[dict]:
+    def get_all_stores(self, show_inactive_stores: bool = False) -> Annotated[
+        Any,
+        "JSON like object, typically reponse from request library. On failure returns empty list of dict",
+    ]:
         """
         Retrieve all stores in a ShipStation instance
             :param show_inactive_stores: True if results should have inactive stores, false if not
-        Returns a dictionary containing all
+        Returns a list of dictionaries with all store information
         """
         stores_url = self.build_path_url("stores")
         params = {"showInactive": show_inactive_stores}
@@ -219,12 +245,16 @@ class ShipStation(ShipStationMeta):
         )
         if not res.ok:
             logger.error(f"Failed to get stores URL: {res.reason} -- {res.text}")
-            return {}
-        self.request_remaining = res.headers["X-Rate-Limit-Remaining"]
-        self.request_next_cycle_in_seconds = res.headers["X-Rate-Limit-Reset"]
+            return [{}]
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
         return res.json()
 
-    def get_order(self, order_id: str, custom_params: dict = {}) -> list[dict]:
+    def get_order(
+        self, order_id: str, custom_params: dict[str, Any] = {}
+    ) -> ShipStationOrderResponse:
         """
         Attempts to get a single order given an order ID
             :param order_id: The order ID to search for
@@ -240,12 +270,23 @@ class ShipStation(ShipStationMeta):
             logger.error(
                 f"Failed to get order {str(order_id)}: {res.status_code} -- {res.text}"
             )
-            return {}
-        self.request_next_cycle_in_seconds = res.headers["X-Rate-Limit-Reset"]
-        self.request_remaining = res.headers["X-Rate-Limit-Remaining"]
-        return res.json()
+            return ShipStationOrderResponse([])
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        json_as_dict = self.__convert_request_json_to_dict(res.json()["orders"])
+        return ShipStationOrderResponse(json_as_dict)
 
-    def get_order_by_order_number(self, order_number: str) -> list[dict]:
+    def __convert_request_json_to_dict(self, json_object: Any) -> Any:
+        try:
+            request_as_dict = json.loads(json_object)
+            print(request_as_dict)
+            return request_as_dict
+        except Exception:
+            return [{}]
+
+    def get_order_by_order_number(self, order_number: str) -> ShipStationOrderResponse:
         """
         Returns a list of orders given an order number
             :param order_number: order number to search for
@@ -254,7 +295,7 @@ class ShipStation(ShipStationMeta):
         order = self.get_all_orders(custom_params={"orderNumber": order_number})
         if not order:
             logger.error(f"Failed to get order with order number {order_number}")
-            return {}
+            return order
         return order
 
     def api_limit_at_max(self) -> bool:
@@ -264,7 +305,9 @@ class ShipStation(ShipStationMeta):
         """
         return int(self.request_remaining) <= 0
 
-    def get_all_orders(self, custom_params: dict = {}) -> list[dict]:
+    def get_all_orders(
+        self, custom_params: dict[str, Any] = {}
+    ) -> ShipStationOrderResponse:
         """
         Get all orders in a ShipStation Instance
             :param custom_params: Custom filters for retrieving orders
@@ -277,12 +320,19 @@ class ShipStation(ShipStationMeta):
         )
         if not res.ok:
             logger.error(f"Failed to get all orders: {res.status_code} -- {res.text}")
-            return {}
-        self.request_remaining = res.headers["X-Rate-Limit-Remaining"]
-        self.request_next_cycle_in_seconds = res.headers["X-Rate-Limit-Reset"]
-        return res.json()
+            print("Didn't work")
+            return ShipStationOrderResponse([])
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        print(res.json()["orders"][:2])
+        order_detail = ShipStationOrderResponse(res.json()["orders"])
+        return order_detail
 
-    def get_waiting_orders(self, status: str = "awaiting_shipment") -> list[dict]:
+    def get_waiting_orders(
+        self, status: str = "awaiting_shipment"
+    ) -> ShipStationOrderResponse:
         """
         Gets all orders with a specific status
             :param status: status of orders to look for
@@ -291,7 +341,6 @@ class ShipStation(ShipStationMeta):
         order = self.get_all_orders(custom_params={"orderStatus": status})
         if not order:
             logger.error(f"Unable to get orders with {status} status")
-            return {}
         return order
 
     def get_order_id_by_order_number(self, order_number: str) -> list[str]:
@@ -304,13 +353,13 @@ class ShipStation(ShipStationMeta):
         if not orders:
             logger.error(f"Failed to get order with order number {order_number}")
             return []
-        elif len(orders["orders"]) >= 2:
+        elif orders.order_count >= 2:
             logger.warning(
                 f"Ambiguous number of orders for order number {order_number}"
             )
-        return [str(order["orderId"]) for order in orders["orders"]]
+        return orders.order_ids
 
-    def is_order_able_to_be_updated(self, order_json: dict) -> bool:
+    def is_order_able_to_be_updated(self, order_json: Any) -> bool:
         """
         Determines if the given order is able to be updated
             :param order_json: order information from the ShipStation API in json/dict format
@@ -319,10 +368,53 @@ class ShipStation(ShipStationMeta):
         order_status = order_json["orderStatus"]
         return order_status in self.order_status_able_to_be_updated
 
+    def __remove_invalid_order_keys(self, order_body: Any) -> dict[Any, Any]:
+        """
+        Removes any keys not needed to update an order in ShipStation
+            :param order_body: the order information recieved by the ShipStation API
+        Returns the original dictionary without any of the keys that can't be proceesed by the update order API
+        """
+        return {
+            k: v
+            for k, v in order_body
+            if k not in self.remove_order_keys_before_updating
+        }
+
+    def update_order_custom_note(
+        self,
+        order_body: dict[Any, Any],
+        custom_note_key: str,
+        custom_note_str: str,
+        custom_note_parent_key: str = "advancedOptions",
+    ) -> dict[Any, Any]:
+        """
+        Updates the custom note sections of the order json
+        """
+        order_body[custom_note_parent_key][custom_note_key] = custom_note_str
+        return order_body
+
+    def __update_api_limits(
+        self, request_remaining: int, seconds_before_cycle_reset: int
+    ) -> bool:
+        """
+        Internal function for updating the remaining limits and API cycle
+            :param request_remaining: the number of request remaining in this cycle
+            :param seconds_before_cycle_reset: the number of seconds remaining before the API limit resets
+        Returns true if the internal counters were updated, False if not
+        """
+        try:
+            self.request_remaining = request_remaining
+            self.request_next_cycle_in_seconds = seconds_before_cycle_reset
+        except Exception as e:
+            logger.error("Failed to update API limits", e)
+            return False
+        return True
+
     def update_order_notes(
         self,
         order_id: str,
-        custom_note: str,
+        internal_note: str,
+        custom_note: str = "",
         custom_note2: str = "",
         custom_note3: str = "",
     ) -> bool:
@@ -338,7 +430,7 @@ class ShipStation(ShipStationMeta):
         """
         update_status = False
         order = self.get_order(order_id=order_id)
-        if not order:
+        if order.is_empty:
             logger.error(f"Unable to get order {order_id}")
             return update_status
         if self.api_limit_at_max():
@@ -347,29 +439,40 @@ class ShipStation(ShipStationMeta):
             )
             return update_status
         if not self.is_order_able_to_be_updated(order):
-            order_status = order["orderStatus"]
+            # Some orders can't be updated depending on their status i.e. shipped orders cannot be updated in the API
+            order_status = order.orders["orderStatus"]
             logger.error(
                 f"Order {order_id} is not able to be updated in {order_status} status"
             )
             return update_status
-        order_body = {
-            k: v
-            for k, v in order.items()
-            if k not in self.remove_order_keys_before_updating
-        }
-        # TODO: Change this to internal notes
-        order_body["internalNotes"] = custom_note
+        order_body = self.__remove_invalid_order_keys(order.orders)
+        order_body["internalNotes"] = internal_note
+        if custom_note:
+            order_body = self.update_order_custom_note(
+                order_body=order_body,
+                custom_note_key="customField",
+                custom_note_str=custom_note,
+            )
         if custom_note2:
-            order_body["advancedOptions"]["customField2"] = custom_note2
+            order_body = self.update_order_custom_note(
+                order_body=order_body,
+                custom_note_key="customField2",
+                custom_note_str=custom_note2,
+            )
         if custom_note3:
-            order_body["advancedOptions"]["customField3"] = custom_note3
+            order_body = self.update_order_custom_note(
+                order_body=order_body,
+                custom_note_key="customField3",
+                custom_note_str=custom_note3,
+            )
         order_url = self.build_path_url("order_update")
         headers = self.authorization_header | {"Content-Type": "application/json"}
         res = requests.post(order_url, json=order_body, headers=headers, timeout=5)
         if not res.ok:
             logger.error(f"Failed to send order. {res.status_code} -- {res.text}")
             return update_status
-        self.request_remaining = res.headers["X-Rate-Limit-Remaining"]
-        self.request_next_cycle_in_seconds = res.headers["X-Rate-Limit-Reset"]
-        update_status = True
-        return update_status
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        return True
