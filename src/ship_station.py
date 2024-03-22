@@ -4,6 +4,7 @@ from typing import Any, Annotated
 import json
 
 import requests
+from requests.exceptions import ReadTimeout, ConnectionError
 from loguru import logger
 from order_response import ShipStationOrderResponse
 
@@ -110,8 +111,8 @@ class ShipStation(ShipStationMeta):
         self.__build_authorization_header()
 
     def __remove_basic_in_auth_string(self, auth_string: str) -> str:
-        if "basic" in auth_string.lower():
-            auth_string = auth_string.lower().split("basic ")[-1]
+        if "Basic" in auth_string:
+            auth_string = auth_string.replace("Basic ", "")
         return auth_string
 
     def __decode_b64_auth_string(self, auth_string: str) -> list[str]:
@@ -181,7 +182,18 @@ class ShipStation(ShipStationMeta):
         if friendly_name:
             event_body = event_body | {"friendly_name": friendly_name}
         headers = self.authorization_header | {"Content-Type": "application/json"}
-        res = requests.post(webhook_url, json=event_body, headers=headers, timeout=5)
+        try:
+            res = requests.post(
+                webhook_url, json=event_body, headers=headers, timeout=3
+            )
+        except ReadTimeout as rt:
+            logger.error(f"Timeout on {webhook_url} -- {rt}")
+            return False
+        except ConnectionError as connect_error:
+            logger.error(
+                f"Invalid connection attempted {webhook_url} -- {connect_error}"
+            )
+            return False
         if not res.ok:
             logger.error(f"Failed to make webhook: {res.status_code} -- {res.text}")
             return False
@@ -202,12 +214,23 @@ class ShipStation(ShipStationMeta):
             logger.error(
                 f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds"
             )
-            return [{}]
+            return []
         webhook_url = self.build_path_url("webhooks")
-        res = requests.get(webhook_url, headers=self.authorization_header, timeout=5)
+        try:
+            res = requests.get(
+                webhook_url, headers=self.authorization_header, timeout=3
+            )
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {webhook_url} -- {timeout}")
+            return []
+        except ConnectionError as connect_error:
+            logger.error(
+                f"Invalid connection attempted {webhook_url} -- {connect_error}"
+            )
+            return []
         if not res.ok:
             logger.error(f"Failed to get webhook lists {res.status_code} -- {res.text}")
-            return [{}]
+            return []
         webhook_list = res.json()["webhooks"]
         return webhook_list
 
@@ -223,7 +246,18 @@ class ShipStation(ShipStationMeta):
             )
             return False
         webhook_url = self.build_path_url("webhook_delete", str(webhook_id))
-        res = requests.delete(webhook_url, headers=self.authorization_header, timeout=5)
+        try:
+            res = requests.delete(
+                webhook_url, headers=self.authorization_header, timeout=3
+            )
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {webhook_url} -- {timeout}")
+            return False
+        except ConnectionError as connect_error:
+            logger.error(
+                f"Invalid connection attempted {webhook_url} -- {connect_error}"
+            )
+            return False
         if not res.ok:
             logger.error(f"Failed to get webhook lists {res.status_code} -- {res.text}")
             return False
@@ -240,12 +274,21 @@ class ShipStation(ShipStationMeta):
         """
         stores_url = self.build_path_url("stores")
         params = {"showInactive": show_inactive_stores}
-        res = requests.get(
-            stores_url, params=params, headers=self.authorization_header, timeout=5
-        )
+        try:
+            res = requests.get(
+                stores_url, params=params, headers=self.authorization_header, timeout=3
+            )
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {stores_url} -- {timeout}")
+            return []
+        except ConnectionError as connect_error:
+            logger.error(
+                f"Invalid connection attempted {stores_url} -- {connect_error}"
+            )
+            return []
         if not res.ok:
             logger.error(f"Failed to get stores URL: {res.reason} -- {res.text}")
-            return [{}]
+            return []
         self.__update_api_limits(
             int(res.headers["X-Rate-Limit-Remaining"]),
             int(res.headers["X-Rate-Limit-Reset"]),
@@ -263,9 +306,16 @@ class ShipStation(ShipStationMeta):
         """
         order_url = self.build_path_url("orders") + str(order_id)
         params = custom_params
-        res = requests.get(
-            order_url, params=params, headers=self.authorization_header, timeout=5
-        )
+        try:
+            res = requests.get(
+                order_url, params=params, headers=self.authorization_header, timeout=3
+            )
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {order_url} -- {timeout}")
+            return ShipStationOrderResponse([])
+        except ConnectionError as connect_error:
+            logger.error(f"Invalid connection attempted {order_id} -- {connect_error}")
+            return ShipStationOrderResponse([])
         if not res.ok:
             logger.error(
                 f"Failed to get order {str(order_id)}: {res.status_code} -- {res.text}"
@@ -281,10 +331,9 @@ class ShipStation(ShipStationMeta):
     def __convert_request_json_to_dict(self, json_object: Any) -> Any:
         try:
             request_as_dict = json.loads(json_object)
-            print(request_as_dict)
             return request_as_dict
         except Exception:
-            return [{}]
+            return []
 
     def get_order_by_order_number(self, order_number: str) -> ShipStationOrderResponse:
         """
@@ -315,18 +364,23 @@ class ShipStation(ShipStationMeta):
         """
         order_url = self.build_path_url("orders")
         params = custom_params
-        res = requests.get(
-            order_url, params=params, headers=self.authorization_header, timeout=5
-        )
+        try:
+            res = requests.get(
+                order_url, params=params, headers=self.authorization_header, timeout=3
+            )
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {order_url} -- {timeout}")
+            return ShipStationOrderResponse([])
+        except ConnectionError as connect_error:
+            logger.error(f"Invalid connection attempted {order_url} -- {connect_error}")
+            return ShipStationOrderResponse([])
         if not res.ok:
             logger.error(f"Failed to get all orders: {res.status_code} -- {res.text}")
-            print("Didn't work")
             return ShipStationOrderResponse([])
         self.__update_api_limits(
             int(res.headers["X-Rate-Limit-Remaining"]),
             int(res.headers["X-Rate-Limit-Reset"]),
         )
-        print(res.json()["orders"][:2])
         order_detail = ShipStationOrderResponse(res.json()["orders"])
         return order_detail
 
@@ -365,8 +419,11 @@ class ShipStation(ShipStationMeta):
             :param order_json: order information from the ShipStation API in json/dict format
         Returns True if the order is able to be updated. False otherwise
         """
-        order_status = order_json["orderStatus"]
-        return order_status in self.order_status_able_to_be_updated
+        if "orderStatus" in order_json:
+            order_status = order_json["orderStatus"]
+            return order_status in self.order_status_able_to_be_updated
+        else:
+            return False
 
     def __remove_invalid_order_keys(self, order_body: Any) -> dict[Any, Any]:
         """
@@ -467,7 +524,14 @@ class ShipStation(ShipStationMeta):
             )
         order_url = self.build_path_url("order_update")
         headers = self.authorization_header | {"Content-Type": "application/json"}
-        res = requests.post(order_url, json=order_body, headers=headers, timeout=5)
+        try:
+            res = requests.post(order_url, json=order_body, headers=headers, timeout=3)
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {order_url} -- {timeout}")
+            return update_status
+        except ConnectionError as connect_error:
+            logger.error(f"Invalid connection attempted {order_url} -- {connect_error}")
+            return update_status
         if not res.ok:
             logger.error(f"Failed to send order. {res.status_code} -- {res.text}")
             return update_status

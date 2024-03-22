@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 profile = "black"
 
 [tool.pytest.ini_options]
-addopts = "--cov=ship_station"
+addopts = "--cov=ship_station --cov-report term-missing"
 testpaths = [
     "tests",
 ]
