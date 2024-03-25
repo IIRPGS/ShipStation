@@ -1,4 +1,4 @@
-from ship_station import ShipStation, ShipStationMeta
+from ship_station.ship_station import ShipStation, ShipStationMeta
 import unittest
 from copy import deepcopy
 

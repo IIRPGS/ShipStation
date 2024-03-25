@@ -1,4 +1,4 @@
-from ship_station import ShipStationMeta
+from ship_station.ship_station import ShipStationMeta
 import unittest
 from validators import url
 

@@ -1,4 +1,5 @@
-from ship_station import ShipStation, ShipStationOrderResponse
+from ship_station.ship_station import ShipStation
+from ship_station.order_response import ShipStationOrderResponse
 import unittest
 from unittest.mock import patch, MagicMock
 from validators import url
@@ -32,7 +33,7 @@ class TestShipStationStores(unittest.TestCase):
         self.assertEqual(order_url, expected_update_order_url + order_id)
         self.assertTrue(url(order_url))
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_get_order_by_order_number(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -52,7 +53,7 @@ class TestShipStationStores(unittest.TestCase):
         self.assertTrue(order_id in order_res.order_ids)
         self.assertAlmostEqual(expected_json[order_build_string].pop(), order_res.orders[order_id])
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_get_order_with_bad_status_code(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -68,7 +69,7 @@ class TestShipStationStores(unittest.TestCase):
         self.assertTrue(order_res.is_empty)
         self.assertEqual(order_res.orders, empty_orders)
 
-    @patch("ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
     def test_get_order_with_timeout(self, mock_url):
         ship_station = get_ship_station_instance()
 
@@ -82,7 +83,7 @@ class TestShipStationStores(unittest.TestCase):
         self.assertTrue(order_res.is_empty)
         self.assertEqual(order_res.orders, empty_orders)
 
-    @patch("ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
     def test_get_order_with_invalid_url(self, mock_url):
         ship_station = get_ship_station_instance()
         empty_orders = {}

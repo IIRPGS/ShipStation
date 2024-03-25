@@ -1,4 +1,4 @@
-from ship_station import ShipStation
+from ship_station.ship_station import ShipStation
 import unittest
 from unittest.mock import patch, MagicMock
 from validators import url
@@ -14,7 +14,7 @@ def get_ship_station_instance(ss_api_key="Fake Key", ss_api_secret="Fake Secret"
 
 
 class TestShipStationStores(unittest.TestCase):
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_get_all_stores(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -86,7 +86,7 @@ class TestShipStationStores(unittest.TestCase):
         mock_request.get.return_value = mock_res
         self.assertEqual(ship_station.get_all_stores(), expected_json_response)
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_get_all_stores_empty_response(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -97,8 +97,8 @@ class TestShipStationStores(unittest.TestCase):
         mock_request.get.return_value = mock_res
         self.assertEqual(ship_station.get_all_stores(), expected_json_response)
 
-    @patch("ship_station.ShipStation.build_path_url")
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.requests")
     def test_build_url_get_all_stores(self, mock_request, mock_url):
         ship_station = get_ship_station_instance()
 
@@ -121,7 +121,7 @@ class TestShipStationStores(unittest.TestCase):
         self.assertEqual(store_url, expected_build_url)
         self.assertTrue(url(store_url))
 
-    @patch("ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
     def test_connection_error_get_stores(self, mock_url):
         ship_station = get_ship_station_instance()
         mock_url.return_value = invalid_api_url
@@ -133,7 +133,7 @@ class TestShipStationStores(unittest.TestCase):
 
         self.assertEqual(ship_station.get_all_stores(), invalid_store_return)
 
-    @patch("ship_station.requests.get")
+    @patch("ship_station.ship_station.requests.get")
     def test_failed_request_to_get_all_stores(self, mock_request):
         ship_station = get_ship_station_instance()
 

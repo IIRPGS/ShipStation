@@ -5,7 +5,7 @@ from typing import Any, Annotated
 import requests
 from requests.exceptions import ReadTimeout, ConnectionError
 from loguru import logger
-from order_response import ShipStationOrderResponse
+from .order_response import ShipStationOrderResponse
 
 
 @dataclass
@@ -397,7 +397,7 @@ class ShipStation(ShipStationMeta):
             logger.warning(
                 f"Ambiguous number of orders for order number {order_number}"
             )
-        return orders.order_ids
+        return list(orders.order_ids)
 
     def is_order_able_to_be_updated(self, order_json: Any) -> bool:
         """

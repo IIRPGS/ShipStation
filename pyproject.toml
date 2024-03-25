@@ -2,6 +2,15 @@
 requires = ["setuptools>=69.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "ship_station"
+requires-python = ">= 3.12"
+dynamic = ["version"]
+description = "ShipStation Order API Wrapper"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+
 [tool.isort]
 profile = "black"
 
@@ -11,8 +20,13 @@ testpaths = [
     "tests",
 ]
 
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ship_station*"]
+exclude = ["ship_station.tests*", "ship_station.examples*"]
+
 [tool.mypy]
-mypy_path = "src"
+mypy_path = "src/ship_station"
 check_untyped_defs = true
 disallow_any_generics = true
 ignore_missing_imports = true

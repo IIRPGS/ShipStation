@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
-from ship_station import ShipStation, ShipStationOrderResponse
+from ship_station.ship_station import ShipStation
+from ship_station.order_response import ShipStationOrderResponse
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(BASEDIR, ".env"))

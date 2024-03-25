@@ -1,4 +1,4 @@
-from ship_station import ShipStation
+from ship_station.ship_station import ShipStation, ShipStationMeta
 from unittest.mock import patch, MagicMock
 import unittest
 from validators import url
@@ -40,7 +40,7 @@ class TestShipStationWebhook(unittest.TestCase):
         self.assertEqual(delete_webhook_url, expected_delete_webhook_url)
         self.assertTrue(url(delete_webhook_url))
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_successful_webhook_subscription(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -54,7 +54,7 @@ class TestShipStationWebhook(unittest.TestCase):
         subscription_status = ship_station.create_webhook_subscription(callback_url)
         self.assertTrue(subscription_status)
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_failed_webhook_subscription(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -75,7 +75,7 @@ class TestShipStationWebhook(unittest.TestCase):
         subscription_status = ship_station.create_webhook_subscription(callback_url)
         self.assertFalse(subscription_status)
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_invalid_auth_webhook_subscription(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -88,7 +88,7 @@ class TestShipStationWebhook(unittest.TestCase):
         subscription_status = ship_station.create_webhook_subscription(callback_url)
         self.assertFalse(subscription_status)
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_webhook_subscription_with_optional_details(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -118,7 +118,7 @@ class TestShipStationWebhook(unittest.TestCase):
 
         self.assertFalse(ship_station.create_webhook_subscription(callback_url))
 
-    @patch("ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
     def test_build_url_webhook_subscription(self, mock_url):
         ship_station = get_ship_station_instance()
         expected_build_url = "https://ssapi.shipstation.com/webhooks/"
@@ -126,7 +126,7 @@ class TestShipStationWebhook(unittest.TestCase):
 
         self.assertEqual(expected_build_url, ship_station.build_path_url("webhook"))
 
-    @patch("ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
     def test_url_build_webhook_subscription(self, mock_url):
         ship_station = get_ship_station_instance()
         expected_build_url = "https://api.shipstation.com/webhooks/"
@@ -136,7 +136,7 @@ class TestShipStationWebhook(unittest.TestCase):
 
         self.assertFalse(ship_station.create_webhook_subscription(callback_url))
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_get_webooks(self, mock_request):
         ship_station = get_ship_station_instance()
         expected_json = {
@@ -168,7 +168,7 @@ class TestShipStationWebhook(unittest.TestCase):
         recieved_res = ship_station.get_webhooks()
         self.assertEqual(recieved_res, expected_json["webhooks"])
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_empty_get_webhook_list(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -192,7 +192,7 @@ class TestShipStationWebhook(unittest.TestCase):
 
         self.assertEqual(ship_station.get_webhooks(), [])
 
-    @patch("ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
     def test_url_build_webhook_list(self, mock_url):
         ship_station = get_ship_station_instance()
         expected_build_url = "https://ssapi.shipstation.com/webhooks/"
@@ -200,7 +200,7 @@ class TestShipStationWebhook(unittest.TestCase):
 
         self.assertEqual(expected_build_url, ship_station.build_path_url("webhook"))
 
-    @patch("ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
     def test_invalid_url_webhook_list(self, mock_url):
         ship_station = get_ship_station_instance()
         invalid_build_url = "https://api.shipstation.com/"
@@ -208,7 +208,7 @@ class TestShipStationWebhook(unittest.TestCase):
 
         self.assertFalse(ship_station.get_webhooks())
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_failed_request_get_webhook_list(self, mock_request):
         ship_station = get_ship_station_instance()
 
@@ -221,7 +221,7 @@ class TestShipStationWebhook(unittest.TestCase):
         recieved_res = ship_station.get_webhooks()
         self.assertEqual(recieved_res, expected_json["webhooks"])
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_delete_webhook(self, mock_request):
         ship_station = get_ship_station_instance()
         webhook_id = "12345"
@@ -232,7 +232,7 @@ class TestShipStationWebhook(unittest.TestCase):
         mock_request.delete.return_value = mock_res
         self.assertTrue(ship_station.delete_webhook(webhook_id))
 
-    @patch("ship_station.requests")
+    @patch("ship_station.ship_station.requests")
     def test_failed_request_delete_webhook(self, mock_request):
         ship_station = get_ship_station_instance()
         webhook_id = "12345"
@@ -250,7 +250,7 @@ class TestShipStationWebhook(unittest.TestCase):
 
         self.assertFalse(ship_station.delete_webhook(webhook_id))
 
-    @patch("ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
     def test_url_build_delete_webhook(self, mock_url):
         ship_station = get_ship_station_instance()
         expected_build_url = "https://ssapi.shipstation.com/webhooks/"
@@ -259,7 +259,7 @@ class TestShipStationWebhook(unittest.TestCase):
             expected_build_url, ship_station.build_path_url("webhook_delete")
         )
 
-    @patch("ship_station.ShipStation.build_path_url")
+    @patch("ship_station.ship_station.ShipStation.build_path_url")
     def test_invalid_url_delete_webhook(self, mock_url):
         ship_station = get_ship_station_instance()
         invalid_build_url = "https://api.shipstation.com/"
