@@ -1,7 +1,6 @@
 import base64
 from dataclasses import dataclass
 from typing import Any, Annotated
-import json
 
 import requests
 from requests.exceptions import ReadTimeout, ConnectionError
@@ -295,9 +294,7 @@ class ShipStation(ShipStationMeta):
         )
         return res.json()
 
-    def get_order(
-        self, order_id: str, custom_params: dict[str, Any] = {}
-    ) -> ShipStationOrderResponse:
+    def get_order(self, order_id: str) -> ShipStationOrderResponse:
         """
         Attempts to get a single order given an order ID
             :param order_id: The order ID to search for
@@ -305,11 +302,8 @@ class ShipStation(ShipStationMeta):
         Returns a list of dicts containing the order information
         """
         order_url = self.build_path_url("orders") + str(order_id)
-        params = custom_params
         try:
-            res = requests.get(
-                order_url, params=params, headers=self.authorization_header, timeout=3
-            )
+            res = requests.get(order_url, headers=self.authorization_header, timeout=3)
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {order_url} -- {timeout}")
             return ShipStationOrderResponse([])
@@ -325,15 +319,7 @@ class ShipStation(ShipStationMeta):
             int(res.headers["X-Rate-Limit-Remaining"]),
             int(res.headers["X-Rate-Limit-Reset"]),
         )
-        json_as_dict = self.__convert_request_json_to_dict(res.json()["orders"])
-        return ShipStationOrderResponse(json_as_dict)
-
-    def __convert_request_json_to_dict(self, json_object: Any) -> Any:
-        try:
-            request_as_dict = json.loads(json_object)
-            return request_as_dict
-        except Exception:
-            return []
+        return ShipStationOrderResponse([res.json()])
 
     def get_order_by_order_number(self, order_number: str) -> ShipStationOrderResponse:
         """
@@ -446,6 +432,8 @@ class ShipStation(ShipStationMeta):
     ) -> dict[Any, Any]:
         """
         Updates the custom note sections of the order json
+            :param order_body: the json body to update/return after updating
+            :param custom_note_key: the dict key to update the
         """
         order_body[custom_note_parent_key][custom_note_key] = custom_note_str
         return order_body
