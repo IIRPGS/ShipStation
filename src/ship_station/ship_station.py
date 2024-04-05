@@ -420,7 +420,7 @@ class ShipStation(ShipStationMeta):
         """
         return {
             k: v
-            for k, v in order_body
+            for k, v in order_body.items()
             if k not in self.remove_order_keys_before_updating
         }
 
