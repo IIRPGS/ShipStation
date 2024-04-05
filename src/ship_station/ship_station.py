@@ -505,7 +505,9 @@ class ShipStation(ShipStationMeta):
         order = self.get_order(order_id=order_id)
         if not self.__pre_update_order_checks(order=order):
             return update_status
-        order_body = order.orders[order_id]
+        if str(order_id) not in order.orders:
+            logger.error(f"Failed to get order from ShipStation -- {order_id}")
+        order_body = order.orders[str(order_id)]
         order_body = self.__remove_invalid_order_keys(order_body=order_body)
         order_body["internalNotes"] = internal_note
         if custom_note:
