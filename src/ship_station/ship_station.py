@@ -48,6 +48,7 @@ class ShipStationMeta:
         "webhook_subscribe": "/webhooks/subscribe/",
         "webhook_delete": "/webhooks/",
         "order_update": "/orders/createorder/",
+        "order_hold": "/orders/holduntil/",
     }
     order_status_able_to_be_updated = [
         "awaiting_payment",
@@ -438,6 +439,33 @@ class ShipStation(ShipStationMeta):
         order_body[custom_note_parent_key][custom_note_key] = custom_note_str
         return order_body
 
+    def __pre_update_order_checks(self, order: ShipStationOrderResponse) -> bool:
+        """
+        Internal function used to ensure order can be updated:
+            Checks:
+                - If the order response is empty
+                - If the api limit has been reached
+                - Does the order have a status that is able to be updated
+        """
+        if order.is_empty:
+            logger.error(f"Unable to get order {order}")
+            return False
+        if self.api_limit_at_max():
+            logger.error(
+                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds -- order {order}"
+            )
+            return False
+        for _, single_order in order.orders.items():
+            print(single_order["orderStatus"])
+            if not self.is_order_able_to_be_updated(single_order):
+                order_status = single_order["orderStatus"]
+                order_number = single_order["orderNumber"]
+                logger.error(
+                    f"Order is not able to be updated in {order_status} status -- {order_number}"
+                )
+                return False
+        return True
+
     def __update_api_limits(
         self, request_remaining: int, seconds_before_cycle_reset: int
     ) -> bool:
@@ -475,20 +503,7 @@ class ShipStation(ShipStationMeta):
         """
         update_status = False
         order = self.get_order(order_id=order_id)
-        if order.is_empty:
-            logger.error(f"Unable to get order {order_id}")
-            return update_status
-        if self.api_limit_at_max():
-            logger.error(
-                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds -- order {order_id}"
-            )
-            return update_status
-        if not self.is_order_able_to_be_updated(order):
-            # Some orders can't be updated depending on their status i.e. shipped orders cannot be updated in the API
-            order_status = order.orders["orderStatus"]
-            logger.error(
-                f"Order {order_id} is not able to be updated in {order_status} status"
-            )
+        if not self.__pre_update_order_checks(order=order):
             return update_status
         order_body = self.__remove_invalid_order_keys(order.orders)
         order_body["internalNotes"] = internal_note
@@ -523,6 +538,32 @@ class ShipStation(ShipStationMeta):
         if not res.ok:
             logger.error(f"Failed to send order. {res.status_code} -- {res.text}")
             return update_status
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        return True
+
+    def hold_order(
+        self, order_id: int, hold_until_date: Annotated[str, "Format: YYYY-MM-DD"]
+    ) -> bool:
+        """
+        Does not check if order exists
+        """
+        order_url = self.build_path_url("order_hold")
+        headers = self.authorization_header | {"Content-Type": "application/json"}
+        order_body = {"orderID": order_id, "holdUntilDate": hold_until_date}
+        try:
+            res = requests.post(order_url, json=order_body, headers=headers, timeout=3)
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {order_url} -- {timeout}")
+            return False
+        except ConnectionError as connect_error:
+            logger.error(f"Invalid connection attempted {order_url} -- {connect_error}")
+            return False
+        if not res.ok:
+            logger.error(f"Failed to send order. {res.status_code} -- {res.text}")
+            return False
         self.__update_api_limits(
             int(res.headers["X-Rate-Limit-Remaining"]),
             int(res.headers["X-Rate-Limit-Reset"]),

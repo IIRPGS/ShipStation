@@ -41,7 +41,9 @@ class TestShipStationStores(unittest.TestCase):
 
         order_number = "390639144"
         order_id = "123"
-        expected_json = get_valid_order_json(order_id=int(order_id), order_number=order_number)
+        expected_json = get_valid_order_json(
+            order_id=int(order_id), order_number=order_number
+        )
         mock_res.ok = True
         mock_res.status_code = 200
         mock_res.json.return_value = expected_json
@@ -51,7 +53,9 @@ class TestShipStationStores(unittest.TestCase):
 
         self.assertTrue(isinstance(order_res, ShipStationOrderResponse))
         self.assertTrue(order_id in order_res.order_ids)
-        self.assertAlmostEqual(expected_json[order_build_string].pop(), order_res.orders[order_id])
+        self.assertAlmostEqual(
+            expected_json[order_build_string].pop(), order_res.orders[order_id]
+        )
 
     @patch("ship_station.ship_station.requests")
     def test_get_order_with_bad_status_code(self, mock_request):

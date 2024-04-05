@@ -12,6 +12,7 @@ invalid_order_url = "https://ssapi.shipstation.com/"
 invalid_api_url = "https://api.shipstation.com/"
 invalid_order_return = ShipStationOrderResponse([])
 
+
 def get_ship_station_instance(ss_api_key="Fake Key", ss_api_secret="Fake Secret"):
     return ShipStation(ss_api_key, ss_api_secret)
 
