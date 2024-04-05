@@ -299,10 +299,10 @@ class ShipStation(ShipStationMeta):
         """
         Attempts to get a single order given an order ID
             :param order_id: The order ID to search for
-            :param custom_params: any custom fields to filter the request by
         Returns a list of dicts containing the order information
         """
-        order_url = self.build_path_url("orders") + str(order_id)
+        order_url = self.build_path_url("orders")
+        order_url = f"{order_url}{order_id}"
         try:
             res = requests.get(order_url, headers=self.authorization_header, timeout=3)
         except ReadTimeout as timeout:
@@ -505,12 +505,13 @@ class ShipStation(ShipStationMeta):
         order = self.get_order(order_id=order_id)
         if not self.__pre_update_order_checks(order=order):
             return update_status
-        order_body = self.__remove_invalid_order_keys(order.orders)
+        order_body = order.orders[order_id]
+        order_body = self.__remove_invalid_order_keys(order_body=order_body)
         order_body["internalNotes"] = internal_note
         if custom_note:
             order_body = self.update_order_custom_note(
                 order_body=order_body,
-                custom_note_key="customField",
+                custom_note_key="customField1",
                 custom_note_str=custom_note,
             )
         if custom_note2:
@@ -536,7 +537,7 @@ class ShipStation(ShipStationMeta):
             logger.error(f"Invalid connection attempted {order_url} -- {connect_error}")
             return update_status
         if not res.ok:
-            logger.error(f"Failed to send order. {res.status_code} -- {res.text}")
+            logger.error(f"Failed to update order. {res.status_code} -- {res.text}")
             return update_status
         self.__update_api_limits(
             int(res.headers["X-Rate-Limit-Remaining"]),
