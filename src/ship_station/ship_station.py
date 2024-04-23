@@ -49,6 +49,9 @@ class ShipStationMeta:
         "webhook_delete": "/webhooks/",
         "order_update": "/orders/createorder/",
         "order_hold": "/orders/holduntil/",
+        "shipments": "/shipments/",
+        "products": "/products",
+        "products_get": "/products/",
     }
     order_status_able_to_be_updated = [
         "awaiting_payment",
@@ -315,6 +318,7 @@ class ShipStation(ShipStationMeta):
             logger.error(
                 f"Failed to get order {str(order_id)}: {res.status_code} -- {res.text}"
             )
+            print(res)
             return ShipStationOrderResponse([])
         self.__update_api_limits(
             int(res.headers["X-Rate-Limit-Remaining"]),
@@ -446,6 +450,9 @@ class ShipStation(ShipStationMeta):
                 - If the order response is empty
                 - If the api limit has been reached
                 - Does the order have a status that is able to be updated
+
+            :param order: The Order to check wrapped in ShipStationOrderResponse class
+        Returns True if order is ok to be updated, False if not or error occured during check attempt
         """
         if order.is_empty:
             logger.error(f"Unable to get order {order}")
@@ -456,7 +463,6 @@ class ShipStation(ShipStationMeta):
             )
             return False
         for _, single_order in order.orders.items():
-            print(single_order["orderStatus"])
             if not self.is_order_able_to_be_updated(single_order):
                 order_status = single_order["orderStatus"]
                 order_number = single_order["orderNumber"]
@@ -465,6 +471,9 @@ class ShipStation(ShipStationMeta):
                 )
                 return False
         return True
+
+    def reset_api_limits(self) -> None:
+        self.__update_api_limits(40, 60)
 
     def __update_api_limits(
         self, request_remaining: int, seconds_before_cycle_reset: int
@@ -551,8 +560,19 @@ class ShipStation(ShipStationMeta):
         self, order_id: int, hold_until_date: Annotated[str, "Format: YYYY-MM-DD"]
     ) -> bool:
         """
-        Does not check if order exists
+        Holds an order in ShipStation until given date is reached
+        Does not check if order exists in ShipStation
+
+            :param order_id: ShipStation Order ID to hold
+            :param hold_until_date: Date to hold the order until. Format: YYYY-MM-DD
+
+        Returns True if updated successfully or False if error during attempt
         """
+        if self.api_limit_at_max():
+            logger.error(
+                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds -- order {order}"
+            )
+            return False
         order_url = self.build_path_url("order_hold")
         headers = self.authorization_header | {"Content-Type": "application/json"}
         order_body = {"orderID": order_id, "holdUntilDate": hold_until_date}
@@ -572,3 +592,137 @@ class ShipStation(ShipStationMeta):
             int(res.headers["X-Rate-Limit-Reset"]),
         )
         return True
+
+    def get_shipments(
+        self, custom_params: dict[str, Any] = None
+    ) -> Annotated[dict[Any, Any], "Requests JSON object, typically dict"]:
+        """ """
+        if self.api_limit_at_max():
+            logger.error(
+                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds"
+            )
+            return {}
+        order_url = self.build_path_url("shipments")
+        headers = self.authorization_header
+        try:
+            res = requests.get(
+                order_url, params=custom_params, headers=headers, timeout=3
+            )
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {order_url} -- {timeout}")
+            return {}
+        except ConnectionError as connect_error:
+            logger.error(f"Invalid connection attempted {order_url} -- {connect_error}")
+            return {}
+        if not res.ok:
+            logger.error(f"Failed to send order. {res.status_code} -- {res.text}")
+            return {}
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        return res.json()
+
+    def update_order(self, order_id: str, order_params: dict[Any, Any]) -> bool:
+        """
+        Attempts to update the order with the params given
+            :param order_id: The id of the order needed to be updated
+            :param order_params: Key value pairs in format of shipstation api, see notes below
+
+        Note: orderId and orderNumber are not able to be updated using this method
+        Format for params should match: https://www.shipstation.com/docs/api/orders/create-update-order/
+        """
+        update_status = False
+        order = self.get_order(order_id=order_id)
+        if not self.__pre_update_order_checks(order=order):
+            return update_status
+        if str(order_id) not in order.orders:
+            logger.error(f"Failed to get order from ShipStation -- {order_id}")
+        order_body = order.orders[str(order_id)]
+        order_body = self.__remove_invalid_order_keys(order_body=order_body)
+        for k, v in order_params.items():
+            print("Updating: ", k, v)
+            if k != "orderId" and k != "orderNumber":
+                order_body[k] = v
+        order_url = self.build_path_url("order_update")
+        headers = self.authorization_header | {"Content-Type": "application/json"}
+        try:
+            res = requests.post(order_url, json=order_body, headers=headers, timeout=3)
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {order_url} -- {timeout}")
+            return update_status
+        except ConnectionError as connect_error:
+            logger.error(f"Invalid connection attempted {order_url} -- {connect_error}")
+            return update_status
+        if not res.ok:
+            logger.error(f"Failed to update order. {res.status_code} -- {res.text}")
+            return update_status
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        return True
+
+    def list_products(self, custom_params: dict[Any, Any] = {}) -> list:
+        """List all products that meet custom_params conditions or all products if 
+
+        Args:
+            custom_params (dict[Any, Any], optional): _description_. Defaults to {}.
+
+        Returns:
+            list: _description_
+        """
+        update_status = []
+        product_url = self.build_path_url("products")
+        headers = self.authorization_header | {"Content-Type": "application/json"}
+        try:
+            res = requests.get(
+                product_url, params=custom_params, headers=headers, timeout=3
+            )
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {product_url} -- {timeout}")
+            return update_status
+        except ConnectionError as connect_error:
+            logger.error(
+                f"Invalid connection attempted {product_url} -- {connect_error}"
+            )
+            return update_status
+        if not res.ok:
+            logger.error(f"Failed to update order. {res.status_code} -- {res.text}")
+            return update_status
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        return res.json()["products"]
+
+    def get_product(self, product_id: str) -> dict[Any, Any]:
+        """Attempts to get the details of a specific product in ShipStation
+
+        Args:
+            product_id (str): Product id to get info/search for 
+
+        Returns:
+            dict[Any, Any]: Returns a dict with the product information or an empty dict
+        """
+        update_status = {}
+        product_url = self.build_path_url("products_get") + str(product_id)
+        headers = self.authorization_header | {"Content-Type": "application/json"}
+        try:
+            res = requests.get(product_url, headers=headers, timeout=3)
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {product_url} -- {timeout}")
+            return update_status
+        except ConnectionError as connect_error:
+            logger.error(
+                f"Invalid connection attempted {product_url} -- {connect_error}"
+            )
+            return update_status
+        if not res.ok:
+            logger.error(f"Failed to update order. {res.status_code} -- {res.text}")
+            return update_status
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        return res.json()
