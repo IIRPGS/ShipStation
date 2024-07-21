@@ -48,6 +48,7 @@ class ShipStationMeta:
         "webhook_subscribe": "/webhooks/subscribe/",
         "webhook_delete": "/webhooks/",
         "order_update": "/orders/createorder/",
+        "order_create": "/orders/createorder/",
         "order_hold": "/orders/holduntil/",
         "shipments": "/shipments/",
         "products": "/products",
@@ -664,7 +665,7 @@ class ShipStation(ShipStationMeta):
         return True
 
     def list_products(self, custom_params: dict[Any, Any] = {}) -> list:
-        """List all products that meet custom_params conditions or all products if 
+        """List all products that meet custom_params conditions or all products if
 
         Args:
             custom_params (dict[Any, Any], optional): _description_. Defaults to {}.
@@ -700,7 +701,7 @@ class ShipStation(ShipStationMeta):
         """Attempts to get the details of a specific product in ShipStation
 
         Args:
-            product_id (str): Product id to get info/search for 
+            product_id (str): Product id to get info/search for
 
         Returns:
             dict[Any, Any]: Returns a dict with the product information or an empty dict
@@ -719,10 +720,43 @@ class ShipStation(ShipStationMeta):
             )
             return update_status
         if not res.ok:
-            logger.error(f"Failed to update order. {res.status_code} -- {res.text}")
+            logger.error(
+                f"Failed to get product: {product_id}. {res.status_code} -- {res.text}"
+            )
             return update_status
         self.__update_api_limits(
             int(res.headers["X-Rate-Limit-Remaining"]),
             int(res.headers["X-Rate-Limit-Reset"]),
         )
         return res.json()
+
+    def create_order(self, order_payload: dict[Any, Any]) -> bool:
+        """
+        Attempts to update the order with the params given
+            :param order_id: The id of the order needed to be updated
+            :param order_params: Key value pairs in format of shipstation api, see notes below
+
+        Note: orderId and orderNumber are not able to be updated using this method
+        Format for params should match: https://www.shipstation.com/docs/api/orders/create-update-order/
+        """
+        update_status = False
+        order_url = self.build_path_url("order_create")
+        headers = self.authorization_header | {"Content-Type": "application/json"}
+        try:
+            res = requests.post(
+                order_url, json=order_payload, headers=headers, timeout=3
+            )
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {order_url} -- {timeout}")
+            return update_status
+        except ConnectionError as connect_error:
+            logger.error(f"Invalid connection attempted {order_url} -- {connect_error}")
+            return update_status
+        if not res.ok:
+            logger.error(f"Failed to update order. {res.status_code} -- {res.text}")
+            return update_status
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        return True
