@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=69.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ship_station"
+requires-python = ">= 3.12"
+dynamic = ["version"]
+description = "ShipStation Order API Wrapper"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+addopts = "--cov=ship_station --cov-report term-missing"
+testpaths = [
+    "tests",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ship_station*"]
+exclude = ["ship_station.tests*", "ship_station.examples*"]
+
+[tool.mypy]
+mypy_path = "src/ship_station"
+check_untyped_defs = true
+disallow_any_generics = true
+ignore_missing_imports = true
+no_implicit_optional = true
+show_error_codes = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_configs = true
+no_implicit_reexport = true
+explicit_package_bases = true

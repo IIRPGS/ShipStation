@@ -25,7 +25,7 @@ pytest-cov==4.1.0
 python-dotenv==1.0.1
 requests==2.31.0
 setuptools==69.2.0
--e git+ssh://git@github.com/IIRPGS/ShipStation.git@5aa86d70def0f452902cfd424e38786b541831b2#egg=ship_station
+-e git+ssh://git@github.com/IIRPGS/ShipStation.git@3c40629b08ff60c557e5f23365f03ef2b9e26e4a#egg=ship_station
 snowballstemmer==2.2.0
 types-requests==2.31.0.20240311
 typing_extensions==4.10.0
