@@ -1,8 +1,9 @@
-from ship_station.ship_station import ShipStation, ShipStationMeta
-from unittest.mock import patch, MagicMock
 import unittest
+from unittest.mock import MagicMock, patch
+
 from validators import url
 
+from ship_station.ship_station import ShipStation, ShipStationMeta
 
 get_webhook_build_string = "webhooks"
 subscribe_to_webhook_build_string = "webhook_subscribe"

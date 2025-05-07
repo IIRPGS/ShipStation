@@ -1,10 +1,11 @@
 import base64
 from dataclasses import dataclass
-from typing import Any, Annotated
+from typing import Annotated, Any
 
 import requests
-from requests.exceptions import ReadTimeout, ConnectionError
 from loguru import logger
+from requests.exceptions import ConnectionError, ReadTimeout
+
 from .order_response import ShipStationOrderResponse
 
 
@@ -53,6 +54,7 @@ class ShipStationMeta:
         "shipments": "/shipments/",
         "products": "/products",
         "products_get": "/products/",
+        "carrier_get": "/carriers/",
     }
     order_status_able_to_be_updated = [
         "awaiting_payment",
@@ -75,6 +77,7 @@ class ShipStationMeta:
     host: str = "ssapi.shipstation.com"
     request_remaining: int = 40
     request_next_cycle_in_seconds: int = 60
+    default_timeout: int = 10
 
     def build_path_url(self, path: str, additional_path: str = "") -> str:
         """
@@ -188,7 +191,10 @@ class ShipStation(ShipStationMeta):
         headers = self.authorization_header | {"Content-Type": "application/json"}
         try:
             res = requests.post(
-                webhook_url, json=event_body, headers=headers, timeout=3
+                webhook_url,
+                json=event_body,
+                headers=headers,
+                timeout=self.default_timeout,
             )
         except ReadTimeout as rt:
             logger.error(f"Timeout on {webhook_url} -- {rt}")
@@ -222,7 +228,9 @@ class ShipStation(ShipStationMeta):
         webhook_url = self.build_path_url("webhooks")
         try:
             res = requests.get(
-                webhook_url, headers=self.authorization_header, timeout=3
+                webhook_url,
+                headers=self.authorization_header,
+                timeout=self.default_timeout,
             )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {webhook_url} -- {timeout}")
@@ -252,7 +260,9 @@ class ShipStation(ShipStationMeta):
         webhook_url = self.build_path_url("webhook_delete", str(webhook_id))
         try:
             res = requests.delete(
-                webhook_url, headers=self.authorization_header, timeout=3
+                webhook_url,
+                headers=self.authorization_header,
+                timeout=self.default_timeout,
             )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {webhook_url} -- {timeout}")
@@ -280,7 +290,10 @@ class ShipStation(ShipStationMeta):
         params = {"showInactive": show_inactive_stores}
         try:
             res = requests.get(
-                stores_url, params=params, headers=self.authorization_header, timeout=3
+                stores_url,
+                params=params,
+                headers=self.authorization_header,
+                timeout=self.default_timeout,
             )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {stores_url} -- {timeout}")
@@ -308,7 +321,11 @@ class ShipStation(ShipStationMeta):
         order_url = self.build_path_url("orders")
         order_url = f"{order_url}{order_id}"
         try:
-            res = requests.get(order_url, headers=self.authorization_header, timeout=3)
+            res = requests.get(
+                order_url,
+                headers=self.authorization_header,
+                timeout=self.default_timeout,
+            )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {order_url} -- {timeout}")
             return ShipStationOrderResponse([])
@@ -347,18 +364,23 @@ class ShipStation(ShipStationMeta):
         return int(self.request_remaining) <= 0
 
     def get_all_orders(
-        self, custom_params: dict[str, Any] = {}
+        self, custom_params: dict[str, Any] = None
     ) -> ShipStationOrderResponse:
         """
         Get all orders in a ShipStation Instance
             :param custom_params: Custom filters for retrieving orders
         Returns
         """
+        if not custom_params:
+            custom_params = {}
         order_url = self.build_path_url("orders")
         params = custom_params
         try:
             res = requests.get(
-                order_url, params=params, headers=self.authorization_header, timeout=3
+                order_url,
+                params=params,
+                headers=self.authorization_header,
+                timeout=self.default_timeout,
             )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {order_url} -- {timeout}")
@@ -541,7 +563,12 @@ class ShipStation(ShipStationMeta):
         order_url = self.build_path_url("order_update")
         headers = self.authorization_header | {"Content-Type": "application/json"}
         try:
-            res = requests.post(order_url, json=order_body, headers=headers, timeout=3)
+            res = requests.post(
+                order_url,
+                json=order_body,
+                headers=headers,
+                timeout=self.default_timeout,
+            )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {order_url} -- {timeout}")
             return update_status
@@ -571,14 +598,20 @@ class ShipStation(ShipStationMeta):
         """
         if self.api_limit_at_max():
             logger.error(
-                f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds -- order {order}"
+                f"API limit reached."
+                f"Try again after {self.request_next_cycle_in_seconds} seconds"
             )
             return False
         order_url = self.build_path_url("order_hold")
         headers = self.authorization_header | {"Content-Type": "application/json"}
         order_body = {"orderID": order_id, "holdUntilDate": hold_until_date}
         try:
-            res = requests.post(order_url, json=order_body, headers=headers, timeout=3)
+            res = requests.post(
+                order_url,
+                json=order_body,
+                headers=headers,
+                timeout=self.default_timeout,
+            )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {order_url} -- {timeout}")
             return False
@@ -603,11 +636,16 @@ class ShipStation(ShipStationMeta):
                 f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds"
             )
             return {}
+        if not custom_params:
+            custom_params = {}
         order_url = self.build_path_url("shipments")
         headers = self.authorization_header
         try:
             res = requests.get(
-                order_url, params=custom_params, headers=headers, timeout=3
+                order_url,
+                params=custom_params,
+                headers=headers,
+                timeout=self.default_timeout,
             )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {order_url} -- {timeout}")
@@ -648,7 +686,12 @@ class ShipStation(ShipStationMeta):
         order_url = self.build_path_url("order_update")
         headers = self.authorization_header | {"Content-Type": "application/json"}
         try:
-            res = requests.post(order_url, json=order_body, headers=headers, timeout=3)
+            res = requests.post(
+                order_url,
+                json=order_body,
+                headers=headers,
+                timeout=self.default_timeout,
+            )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {order_url} -- {timeout}")
             return update_status
@@ -664,7 +707,7 @@ class ShipStation(ShipStationMeta):
         )
         return True
 
-    def list_products(self, custom_params: dict[Any, Any] = {}) -> list:
+    def list_products(self, custom_params: dict[Any, Any] = None) -> list:
         """List all products that meet custom_params conditions or all products if
 
         Args:
@@ -673,12 +716,17 @@ class ShipStation(ShipStationMeta):
         Returns:
             list: _description_
         """
+        if not custom_params:
+            custom_params = {}
         update_status = []
         product_url = self.build_path_url("products")
         headers = self.authorization_header | {"Content-Type": "application/json"}
         try:
             res = requests.get(
-                product_url, params=custom_params, headers=headers, timeout=3
+                product_url,
+                params=custom_params,
+                headers=headers,
+                timeout=self.default_timeout,
             )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {product_url} -- {timeout}")
@@ -710,7 +758,9 @@ class ShipStation(ShipStationMeta):
         product_url = self.build_path_url("products_get") + str(product_id)
         headers = self.authorization_header | {"Content-Type": "application/json"}
         try:
-            res = requests.get(product_url, headers=headers, timeout=3)
+            res = requests.get(
+                product_url, headers=headers, timeout=self.default_timeout
+            )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {product_url} -- {timeout}")
             return update_status
@@ -744,7 +794,40 @@ class ShipStation(ShipStationMeta):
         headers = self.authorization_header | {"Content-Type": "application/json"}
         try:
             res = requests.post(
-                order_url, json=order_payload, headers=headers, timeout=3
+                order_url,
+                json=order_payload,
+                headers=headers,
+                timeout=self.default_timeout,
+            )
+            if not res.ok:
+                logger.error(f"Failed to create order. {res.status_code} -- {res.text}")
+                return update_status
+        except ReadTimeout as timeout:
+            logger.error(f"Timeout when calling {order_url} -- {timeout}")
+            return update_status
+        except ConnectionError as connect_error:
+            logger.error(f"Invalid connection attempted {order_url} -- {connect_error}")
+            return update_status
+        self.__update_api_limits(
+            int(res.headers["X-Rate-Limit-Remaining"]),
+            int(res.headers["X-Rate-Limit-Reset"]),
+        )
+        return True
+
+    def list_carriers(self) -> bool:
+        """_summary_
+
+        Returns:
+            bool: _description_
+        """
+        update_status = False
+        order_url = self.build_path_url("carrier_get")
+        headers = self.authorization_header | {"Content-Type": "application/json"}
+        try:
+            res = requests.post(
+                order_url,
+                headers=headers,
+                timeout=self.default_timeout,
             )
         except ReadTimeout as timeout:
             logger.error(f"Timeout when calling {order_url} -- {timeout}")
@@ -759,4 +842,4 @@ class ShipStation(ShipStationMeta):
             int(res.headers["X-Rate-Limit-Remaining"]),
             int(res.headers["X-Rate-Limit-Reset"]),
         )
-        return True
+        return res.json()

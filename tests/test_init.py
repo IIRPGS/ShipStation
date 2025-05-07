@@ -1,6 +1,7 @@
-from ship_station.ship_station import ShipStation, ShipStationMeta
 import unittest
 from copy import deepcopy
+
+from ship_station.ship_station import ShipStation, ShipStationMeta
 
 
 class TestShipStationInit(unittest.TestCase):

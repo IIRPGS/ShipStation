@@ -1,8 +1,10 @@
-from ship_station.ship_station import ShipStation
-from ship_station.order_response import ShipStationOrderResponse
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from validators import url
+
+from ship_station.order_response import ShipStationOrderResponse
+from ship_station.ship_station import ShipStation
 
 order_build_string = "orders"
 update_order_build_string = "order_update"

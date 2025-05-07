@@ -1,7 +1,9 @@
-from ship_station.ship_station import ShipStation
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from validators import url
+
+from ship_station.ship_station import ShipStation
 
 store_build_string = "stores"
 expected_build_url = "https://ssapi.shipstation.com/stores/"
