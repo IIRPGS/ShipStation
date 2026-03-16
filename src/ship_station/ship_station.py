@@ -814,6 +814,75 @@ class ShipStation(ShipStationMeta):
         )
         return True
 
+    def get_inventory(self, custom_params: dict[Any, Any] = None) -> list[dict[str, Any]]:
+        """
+        Retrieves all inventory items with their current quantity and notes.
+        Handles pagination automatically to return all items.
+
+            :param custom_params: Optional additional filters for the products API
+
+        Returns a list of dicts with keys: productId, sku, name, quantityOnHand, notes
+        """
+        if not custom_params:
+            custom_params = {}
+
+        inventory = []
+        page = 1
+        page_size = 100
+
+        while True:
+            if self.api_limit_at_max():
+                logger.error(
+                    f"API limit reached. Try again after {self.request_next_cycle_in_seconds} seconds"
+                )
+                break
+
+            params = custom_params | {"page": page, "pageSize": page_size}
+            product_url = self.build_path_url("products")
+            try:
+                res = requests.get(
+                    product_url,
+                    params=params,
+                    headers=self.authorization_header,
+                    timeout=self.default_timeout,
+                )
+            except ReadTimeout as timeout:
+                logger.error(f"Timeout when calling {product_url} -- {timeout}")
+                break
+            except ConnectionError as connect_error:
+                logger.error(
+                    f"Invalid connection attempted {product_url} -- {connect_error}"
+                )
+                break
+
+            if not res.ok:
+                logger.error(f"Failed to get inventory. {res.status_code} -- {res.text}")
+                break
+
+            self.__update_api_limits(
+                int(res.headers["X-Rate-Limit-Remaining"]),
+                int(res.headers["X-Rate-Limit-Reset"]),
+            )
+
+            data = res.json()
+            products = data.get("products", [])
+
+            for product in products:
+                inventory.append({
+                    "productId": product.get("productId"),
+                    "sku": product.get("sku"),
+                    "name": product.get("name"),
+                    "quantityOnHand": product.get("quantityOnHand"),
+                    "notes": product.get("notes") or "",
+                })
+
+            total = data.get("total", 0)
+            if page * page_size >= total:
+                break
+            page += 1
+
+        return inventory
+
     def list_carriers(self) -> bool:
         """_summary_
 
