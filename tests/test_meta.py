@@ -1,6 +1,8 @@
-from ship_station.ship_station import ShipStationMeta
 import unittest
+
 from validators import url
+
+from ship_station.ship_station import ShipStationMeta
 
 
 class TestShipStationMeta(unittest.TestCase):
