@@ -277,7 +277,9 @@ class ShipStation(ShipStationMeta):
             return False
         return True
 
-    def get_all_stores(self, show_inactive_stores: bool = False) -> Annotated[
+    def get_all_stores(
+        self, show_inactive_stores: bool = False
+    ) -> Annotated[
         Any,
         "JSON like object, typically reponse from request library. On failure returns empty list of dict",
     ]:
@@ -814,7 +816,9 @@ class ShipStation(ShipStationMeta):
         )
         return True
 
-    def get_inventory(self, custom_params: dict[Any, Any] = None) -> list[dict[str, Any]]:
+    def get_inventory(
+        self, custom_params: dict[Any, Any] = None
+    ) -> list[dict[str, Any]]:
         """
         Retrieves all inventory items with their current quantity and notes.
         Handles pagination automatically to return all items.
@@ -856,7 +860,9 @@ class ShipStation(ShipStationMeta):
                 break
 
             if not res.ok:
-                logger.error(f"Failed to get inventory. {res.status_code} -- {res.text}")
+                logger.error(
+                    f"Failed to get inventory. {res.status_code} -- {res.text}"
+                )
                 break
 
             self.__update_api_limits(
@@ -868,13 +874,15 @@ class ShipStation(ShipStationMeta):
             products = data.get("products", [])
 
             for product in products:
-                inventory.append({
-                    "productId": product.get("productId"),
-                    "sku": product.get("sku"),
-                    "name": product.get("name"),
-                    "quantityOnHand": product.get("quantityOnHand"),
-                    "notes": product.get("notes") or "",
-                })
+                inventory.append(
+                    {
+                        "productId": product.get("productId"),
+                        "sku": product.get("sku"),
+                        "name": product.get("name"),
+                        "quantityOnHand": product.get("quantityOnHand"),
+                        "notes": product.get("notes") or "",
+                    }
+                )
 
             total = data.get("total", 0)
             if page * page_size >= total:

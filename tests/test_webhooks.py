@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from validators import url
 
-from ship_station.ship_station import ShipStation, ShipStationMeta
+from ship_station.ship_station import ShipStation
 
 get_webhook_build_string = "webhooks"
 subscribe_to_webhook_build_string = "webhook_subscribe"
@@ -19,7 +19,6 @@ def get_ship_station_instance(ss_api_key="Fake Key", ss_api_secret="Fake Secret"
 
 
 class TestShipStationWebhook(unittest.TestCase):
-
     def test_validate_url_get_webhooks(self):
         ship_station = get_ship_station_instance()
 
@@ -34,7 +33,7 @@ class TestShipStationWebhook(unittest.TestCase):
         self.assertEqual(sub_webhook_url, expected_subscribe_webhook_url)
         self.assertTrue(url(sub_webhook_url))
 
-    def test_validate_url_subscribe_to_webhook(self):
+    def test_validate_url_delete_webhook(self):
         ship_station = get_ship_station_instance()
 
         delete_webhook_url = ship_station.build_path_url(delete_webhook_build_string)
