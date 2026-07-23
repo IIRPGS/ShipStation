@@ -1,7 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from validators import url
 
 from ship_station.ship_station import ShipStation
 
@@ -16,7 +15,6 @@ def get_ship_station_instance(ss_api_key="Fake Key", ss_api_secret="Fake Secret"
 
 
 class TestShipStationStores(unittest.TestCase):
-    
     @patch("ship_station.ship_station.ShipStation.build_path_url")
     @patch("ship_station.ship_station.requests")
     def test_build_url_get_all_stores(self, mock_request, mock_url):
